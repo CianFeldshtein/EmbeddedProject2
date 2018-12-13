@@ -17,14 +17,12 @@ PROCESS(example_unicast_process, "leaf-nodes");
 AUTOSTART_PROCESSES(&example_unicast_process);
 
 /*---------------------------------------------------------------------------*/
-
-//Unicast connection
-static struct unicast_conn uc;
-//Broadcast connection
+//Connections
 static struct broadcast_conn broadcast;
+static struct unicast_conn uc;
 
-static int hopCount = 0;
-static int sequenceNum = 0;
+static int hopCount = -1;
+static int sequenceNum = -1;
 static linkaddr_t *parent;
 static int connected = 0;
 
@@ -45,7 +43,7 @@ broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
 {
 	//creating beacon the pointer msg
 	struct beacon_Message *message;
-    //receiving values
+        //receiving values
 	message = packetbuf_dataptr();
 
 	//reading the values sent to us
@@ -56,38 +54,37 @@ broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
 		
 		hopCount = newHopCount + 1;
 		sequenceNum = newSequenceNum;
-        //copy address from parent
+                //copy address from parent
 		linkaddr_copy(parent, from);
 
 		printf("The new beacon parent is: %d.%d\n\n", from->u8[0], from->u8[1]);
 
 		connected = 1;
 
-        //message points to the start memory which is in the packet buffer and we tell it it is a struct beacon
+                //message points to the start memory which is in the packet buffer and we tell it it is a struct beacon
 		message = (struct beacon_Message *) packetbuf_dataptr(); 
 		packetbuf_set_datalen(sizeof(struct beacon_Message));
-
+                //copy hopCount into beacon hopCount
 		message->hopCount = hopCount;
 		message->sequenceNum= sequenceNum;
 
 		broadcast_send(&broadcast);
 
 	}
-    //if new hop count is better than previous
+        //if new hop count is better than old one
 	else if(hopCount > newHopCount +1){
 
 			hopCount = newHopCount + 1;
 			linkaddr_copy(parent, from);
 
-			printf("New parent path back to source based on hop count is through parent: %d.%d\n\n", from->u8[0], from->u8[1]);
+			printf("New parent based on hop count is through parent: %d.%d\n\n", from->u8[0], from->u8[1]);
 
 			connected = 1;
-
-			packetbuf_clear();
-
+                        //message points to the start memory which is in the packet buffer and we tell it it is a struct beacon
+                        //starts at the start address of beacon
 			message = (struct beacon_Message *) packetbuf_dataptr(); 
 			packetbuf_set_datalen(sizeof(struct beacon_Message));
-
+                        //copy hopCount into beacon hopCount
 			message->hopCount = hopCount;
 			message->sequenceNum= sequenceNum;
 
@@ -118,8 +115,8 @@ PROCESS_THREAD(non_root_process, ev, data)
 	broadcast_open(&broadcast, 121, &broadcast_call);
 
 	while(1){
-		//set to 7 seconds
-                etimer_set(&et, CLOCK_SECOND * 7);
+		//set to 10 seconds
+                etimer_set(&et, CLOCK_SECOND * 10);
 		PROCESS_WAIT_EVENT();
                         
 			if(connected == 0){
@@ -129,7 +126,7 @@ PROCESS_THREAD(non_root_process, ev, data)
 				printf("NOT CONNECTED\n\n");
 
 			}
-                        connected = 0;
+                       // connected = 0;
 	}
 
 	PROCESS_END();
